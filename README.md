@@ -1,149 +1,218 @@
-# 3d-pvp-game
 #include <iostream>
+#include <vector>
+#include <string>
 #include <cmath>
+#include <chrono>
+#include <thread>
+#include <cctype> // Required for tolower()
+
+// --- Data Structures ---
 
 /**
- * @brief A basic class representing a 3D vector (x, y, z).
- * * This class is fundamental for 3D graphics and physics, handling
- * positions, directions, and forces.
+ * @brief Represents a simple 3D vector for position and direction.
  */
-class Vector3 {
-public:
-    double x, y, z;
+struct Vector3 {
+    float x, y, z;
 
-    /**
-     * @brief Default constructor. Initializes vector to (0, 0, 0).
-     */
-    Vector3() : x(0.0), y(0.0), z(0.0) {}
+    // Default constructor
+    Vector3(float x = 0.0f, float y = 0.0f, float z = 0.0f) : x(x), y(y), z(z) {}
 
-    /**
-     * @brief Constructor with custom values.
-     * @param _x The x-component.
-     * @param _y The y-component.
-     * @param _z The z-component.
-     */
-    Vector3(double _x, double _y, double _z) : x(_x), y(_y), z(_z) {}
-
-    // --- Vector Operations ---
-
-    /**
-     * @brief Calculates the magnitude (length) of the vector.
-     * @return The magnitude of the vector.
-     */
-    double magnitude() const {
-        return std::sqrt(x * x + y * y + z * z);
-    }
-
-    /**
-     * @brief Returns a new vector that is the normalized (unit) version of this vector.
-     * * A unit vector has a magnitude of 1, preserving the original direction.
-     * @return A normalized Vector3.
-     */
-    Vector3 normalize() const {
-        double mag = magnitude();
-        if (mag > 1e-6) { // Avoid division by zero
-            return Vector3(x / mag, y / mag, z / mag);
-        }
-        return Vector3(); // Returns zero vector if magnitude is zero
-    }
-
-    /**
-     * @brief Calculates the dot product with another vector.
-     * @param other The other Vector3.
-     * @return The scalar dot product value.
-     */
-    double dot(const Vector3& other) const {
-        return x * other.x + y * other.y + z * other.z;
-    }
-
-    /**
-     * @brief Calculates the cross product with another vector.
-     * @param other The other Vector3.
-     * @return The resulting Vector3 from the cross product.
-     */
-    Vector3 cross(const Vector3& other) const {
-        return Vector3(
-            y * other.z - z * other.y,
-            z * other.x - x * other.z,
-            x * other.y - y * other.x
-        );
-    }
-
-    // --- Operator Overloads for Convenience ---
-
-    /**
-     * @brief Overloads the addition operator (+).
-     * @param other The vector to add.
-     * @return A new Vector3 that is the sum of the two vectors.
-     */
+    // Basic vector addition
     Vector3 operator+(const Vector3& other) const {
         return Vector3(x + other.x, y + other.y, z + other.z);
     }
-
-    /**
-     * @brief Overloads the subtraction operator (-).
-     * @param other The vector to subtract.
-     * @return A new Vector3 that is the difference of the two vectors.
-     */
-    Vector3 operator-(const Vector3& other) const {
-        return Vector3(x - other.x, y - other.y, z - other.z);
-    }
-
-    /**
-     * @brief Overloads the scalar multiplication operator (*).
-     * @param scalar The scalar value to multiply by.
-     * @return A new Vector3 scaled by the scalar.
-     */
-    Vector3 operator*(double scalar) const {
+    // Basic vector multiplication by a scalar
+    Vector3 operator*(float scalar) const {
         return Vector3(x * scalar, y * scalar, z * scalar);
     }
+};
+
+// --- Character Class (The Player) ---
+
+/**
+ * @brief Represents the player character with position and movement logic.
+ */
+class Character {
+private:
+    Vector3 position;
+    // Set movement speed to 1.0f for a clear 1-unit move per turn in this console simulation
+    float movementSpeed = 1.0f; 
+    float yaw = 0.0f;           // Rotation around the Y-axis (left/right look)
+
+public:
+    Character(Vector3 startPos) : position(startPos) {
+        std::cout << "Character initialized at (" << position.x << ", " << position.y << ", " << position.z << ")\n";
+    }
 
     /**
-     * @brief Overloads the stream insertion operator for easy printing.
-     * @param os The output stream.
-     * @param v The Vector3 to print.
-     * @return The output stream reference.
+     * @brief Handles movement based on input (W/A/S/D equivalent).
+     * @param direction: A normalized vector representing the intended movement direction.
+     * @param deltaTime: Time elapsed since the last update (fixed at 1.0 for console turns).
      */
-    friend std::ostream& operator<<(std::ostream& os, const Vector3& v) {
-        os << "Vector3(" << v.x << ", " << v.y << ", " << v.z << ")";
-        return os;
+    void Move(const Vector3& direction, float deltaTime) {
+        // Calculate the distance to move
+        Vector3 displacement = direction * (movementSpeed * deltaTime);
+        
+        // Simple movement update 
+        position = position + displacement;
+    }
+
+    /**
+     * @brief Processes the console input command and updates character state.
+     * @param deltaTime: Time elapsed since the last frame (fixed at 1.0 for console turns).
+     * @param inputCommand: The key pressed by the user ('w', 'a', 's', 'd').
+     */
+    void Update(float deltaTime, char inputCommand) {
+        Vector3 direction(0.0f, 0.0f, 0.0f);
+        
+        // Map console input to 3D movement direction (X/Z plane)
+        switch (inputCommand) {
+            case 'w': // Forward (Positive Z)
+                direction.z = 1.0f;
+                break;
+            case 's': // Backward (Negative Z)
+                direction.z = -1.0f;
+                break;
+            case 'a': // Left (Negative X)
+                direction.x = -1.0f;
+                break;
+            case 'd': // Right (Positive X)
+                direction.x = 1.0f;
+                break;
+            default:
+                // Do nothing if input is not a movement key
+                return; 
+        }
+
+        // Apply movement
+        Move(direction, deltaTime);
+
+        // Print position update, note the use of std::flush to ensure immediate output
+        std::cout << "Character Pos: (" << position.x << ", " << position.y << ", " << position.z << ")\r" << std::flush;
+    }
+
+    /**
+     * @brief Retrieves the character's current 3D position.
+     * @return Vector3 The current position.
+     */
+    const Vector3& GetPosition() const {
+        return position;
+    }
+};
+
+// --- Game Engine Core ---
+
+/**
+ * @brief The main game class responsible for managing game state and the loop.
+ */
+class Game {
+private:
+    Character player;
+    bool isRunning = true;
+    char lastInput = ' '; // To store the last character command
+
+    /**
+     * @brief Initializes the graphics subsystem (now a console message).
+     */
+    void InitializeGraphics() {
+        std::cout << "\n[Engine] Initializing console simulation...\n";
+    }
+
+    /**
+     * @brief Handles user input by reading a character from the console.
+     * This function blocks until a character is entered.
+     */
+    void ProcessInput() {
+        std::cout << "\n[Turn] Enter command (w/a/s/d to move, q to quit): ";
+        char input;
+        
+        // Wait for user input
+        if (!(std::cin >> input)) {
+            // Handle EOF or read error
+            isRunning = false;
+            lastInput = 'q';
+            return;
+        }
+        lastInput = std::tolower(input); // Store and convert to lowercase
+    }
+
+    /**
+     * @brief Updates all game objects (physics, AI, game logic).
+     * @param deltaTime: Time since the last update (fixed at 1.0 for turn-based).
+     */
+    void Update(float deltaTime) {
+        // Update the player character based on the collected input
+        player.Update(deltaTime, lastInput);
+
+        // Example condition to stop the loop
+        if (player.GetPosition().z > 20.0f) {
+            isRunning = false; 
+            std::cout << "\n[Engine] Game loop exiting (target distance reached).\n";
+        }
+    }
+
+    /**
+     * @brief Draws the 3D scene (now a simple placeholder).
+     */
+    void DrawScene() {
+        // In a real 3D engine, the scene would be rendered here.
+    }
+
+public:
+    /**
+     * @brief Game constructor.
+     */
+    Game() : player(Vector3(0.0f, 0.0f, 0.0f)) { 
+        // Initial position reset to (0, 0, 0) for cleaner start
+    }
+
+    /**
+     * @brief The main entry point for the game loop (now turn-based).
+     */
+    void Run() {
+        InitializeGraphics();
+        
+        std::cout << "[Engine] Starting Interactive Console Simulation...\n";
+        std::cout << "--- Move 1 unit per command in the X/Z plane ---\n";
+
+        // Main loop structure
+        while (isRunning) {
+            // Delta time is fixed at 1.0 for simplicity in this turn-based console environment.
+            float deltaTime = 1.0f; 
+
+            // 1. Input (waits for you to enter a command)
+            ProcessInput();
+            
+            if (lastInput == 'q') {
+                isRunning = false;
+                continue;
+            }
+
+            // 2. Update (Logic)
+            Update(deltaTime);
+
+            // 3. Render (Graphics - placeholder)
+            DrawScene();
+        }
+        
+        std::cout << "\n[Engine] Simulation finished. Thanks for playing!\n";
     }
 };
 
 /**
- * @brief Main function to demonstrate the Vector3 class.
+ * @brief Entry point of the C++ program.
  */
 int main() {
-    // 1. Initialization and printing
-    Vector3 position(1.0, 2.0, 3.0);
-    Vector3 direction(4.0, 0.0, 0.0);
-    std::cout << "--- Vector3 Demonstration ---" << std::endl;
-    std::cout << "Position: " << position << std::endl;
-    std::cout << "Direction: " << direction << std::endl;
+    // Set up standard output formatting for better console display
+    std::cout << std::fixed << std::setprecision(1); // Set precision to 1 decimal place
 
-    // 2. Vector Addition and Subtraction
-    Vector3 result_add = position + direction;
-    std::cout << "Position + Direction: " << result_add << std::endl; // Expected: (5, 2, 3)
-
-    // 3. Scalar Multiplication
-    Vector3 scaled_pos = position * 2.5;
-    std::cout << "Scaled Position: " << scaled_pos << std::endl; // Expected: (2.5, 5.0, 7.5)
-
-    // 4. Magnitude and Normalization
-    std::cout << "Magnitude of Position: " << position.magnitude() << std::endl; 
-    Vector3 normalized_dir = direction.normalize();
-    std::cout << "Normalized Direction: " << normalized_dir << std::endl; // Expected: (1, 0, 0)
-    std::cout << "Magnitude of Normalized Direction: " << normalized_dir.magnitude() << std::endl;
-
-    // 5. Dot Product (measures how similar directions are)
-    Vector3 up(0.0, 1.0, 0.0);
-    double dot_prod = up.dot(direction);
-    std::cout << "Dot product (Up . Direction): " << dot_prod << std::endl; // Expected: 0 (perpendicular)
-
-    // 6. Cross Product (measures perpendicular vector/rotation)
-    Vector3 forward(1.0, 0.0, 0.0);
-    Vector3 right = forward.cross(up);
-    std::cout << "Cross product (Forward x Up): " << right << std::endl; // Expected: (0, 0, 1)
+    try {
+        Game myGame;
+        myGame.Run();
+    } catch (const std::exception& e) {
+        std::cerr << "An error occurred: " << e.what() << std::endl;
+        return 1;
+    }
 
     return 0;
 }
